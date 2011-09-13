@@ -191,7 +191,7 @@ module ActiveRecord
 
       def primary_key(table_name) #:nodoc:
         # FIXME: not supported by Informix 0.7.x
-        if Informix.version =~ /^0\.7/
+        if ::Informix.version =~ /^0\.7/
           query = "SELECT ct.constrname FROM sysconstraints ct, systables st WHERE st.tabid = ct.tabid AND ct.constrtype = 'P' AND st.tabname = '#{table_name}'"
         else
           query = "SELECT FIRST 1 ct.constrname FROM sysconstraints ct, systables st WHERE st.tabid = ct.tabid AND ct.constrtype = 'P' AND st.tabname = '#{table_name}'"
@@ -207,7 +207,7 @@ module ActiveRecord
       def add_limit_offset!(sql, options)
         if options[:limit]
           # FIXME: not supported by Informix 0.7.x
-          if Informix.version =~ /^0\.7/
+          if ::Informix.version =~ /^0\.7/
             Rails.logger.warn "[Informix] FIRST, SKIP, LIMIT are not supported in this version"
             return sql
           else

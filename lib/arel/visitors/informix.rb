@@ -7,7 +7,7 @@ module Arel
         sql = super(o)
 
         # FIXME: not supported by Informix 0.7.x
-        if Informix.version =~ /^0\.7/
+        if ::Informix.version =~ /^0\.7/
           Rails.logger.warn "[Informix] FIRST, SKIP, LIMIT are not supported in this version"
           return sql
         end
