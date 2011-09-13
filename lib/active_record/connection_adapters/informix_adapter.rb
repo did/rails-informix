@@ -1,10 +1,10 @@
 # Copyright (c) 2006-2010, Gerardo Santana Gomez Garrido <gerardo.santana@gmail.com>
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright
 #    notice, this list of conditions and the following disclaimer.
 # 2. Redistributions in binary form must reproduce the above copyright
@@ -12,7 +12,7 @@
 #    documentation and/or other materials provided with the distribution.
 # 3. The name of the author may not be used to endorse or promote products
 #    derived from this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
 # IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -33,7 +33,7 @@ module ActiveRecord
     def self.informix_connection(config) #:nodoc:
       require 'informix' unless self.class.const_defined?(:Informix)
       require 'stringio'
-      
+
       config = config.symbolize_keys
 
       database    = config[:database].to_s
@@ -75,7 +75,7 @@ module ActiveRecord
           type.sub!(/money/i, 'DECIMAL')
           if IFX_TYPES_SUBSET.include? type.upcase
             if prec == 0
-              "#{type}(#{limit})" 
+              "#{type}(#{limit})"
             else
               "#{type}(#{prec},#{scale})"
             end
@@ -137,7 +137,7 @@ module ActiveRecord
       def prefetch_primary_key?(table_name = nil)
         true
       end
- 
+
       def supports_migrations? #:nodoc:
         true
       end
@@ -184,14 +184,21 @@ module ActiveRecord
       def rollback_db_transaction
         @connection.rollback
       end
-      
+
       def add_limit!(sql, options, scope = :auto)
         add_limit_offset!(sql, options)
       end
-      
+
       def primary_key(table_name) #:nodoc:
+        # FIXME: not supported by Informix 0.7.x
+        if Informix.version =~ /^0\.7/
+          query = "SELECT ct.constrname FROM sysconstraints ct, systables st WHERE st.tabid = ct.tabid AND ct.constrtype = 'P' AND st.tabname = '#{table_name}'"
+        else
+          query = "SELECT FIRST 1 ct.constrname FROM sysconstraints ct, systables st WHERE st.tabid = ct.tabid AND ct.constrtype = 'P' AND st.tabname = '#{table_name}'"
+        end
+
         @connection.cursor(<<-end_sql) do |cur|
-            SELECT FIRST 1 ct.constrname FROM sysconstraints ct, systables st WHERE st.tabid = ct.tabid AND ct.constrtype = 'P' AND st.tabname = '#{table_name}'
+            #{query}
           end_sql
           cur.open.fetch.first
         end
@@ -199,10 +206,16 @@ module ActiveRecord
 
       def add_limit_offset!(sql, options)
         if options[:limit]
-          limit = "FIRST #{options[:limit]}"
-          # SKIP available only in IDS >= 10
-          offset = @ifx_version >= 10 && options[:offset]? "SKIP #{options[:offset]}": ""
-          sql.sub!(/^select /i,"SELECT #{offset} #{limit} ")
+          # FIXME: not supported by Informix 0.7.x
+          if Informix.version =~ /^0\.7/
+            Rails.logger.warn "[Informix] FIRST, SKIP, LIMIT are not supported in this version"
+            return sql
+          else
+            limit = "FIRST #{options[:limit]}"
+            # SKIP available only in IDS >= 10
+            offset = @ifx_version >= 10 && options[:offset]? "SKIP #{options[:offset]}": ""
+            sql.sub!(/^select /i,"SELECT #{offset} #{limit} ")
+          end
         end
         sql
       end
@@ -257,7 +270,7 @@ module ActiveRecord
       def indexes(table_name, name = nil)
         indexes = []
       end
-            
+
       def create_table(name, options = {})
         super(name, options)
         execute("CREATE SEQUENCE #{name}_seq")
@@ -272,11 +285,11 @@ module ActiveRecord
         super(name)
         execute("DROP SEQUENCE #{name}_seq")
       end
-      
+
       def rename_column(table, column, new_column_name)
         execute("RENAME COLUMN #{table}.#{column} TO #{new_column_name}")
       end
-      
+
       def change_column(table_name, column_name, type, options = {}) #:nodoc:
         sql = "ALTER TABLE #{table_name} MODIFY #{column_name} #{type_to_sql(type, options[:limit])}"
         add_column_options!(sql, options)

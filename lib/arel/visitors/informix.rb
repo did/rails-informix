@@ -5,6 +5,13 @@ module Arel
     class Informix < Arel::Visitors::ToSql
       def visit_Arel_Nodes_SelectStatement o
         sql = super(o)
+
+        # FIXME: not supported by Informix 0.7.x
+        if Informix.version =~ /^0\.7/
+          Rails.logger.warn "[Informix] FIRST, SKIP, LIMIT are not supported in this version"
+          return sql
+        end
+
         if o.limit
           if o.offset
             # Modifying the SQL to utilize the skip and limit amounts
@@ -20,10 +27,10 @@ module Arel
         end
         sql
       end
-            
-      def visit_Arel_Nodes_Limit o 
+
+      def visit_Arel_Nodes_Limit o
       end
-      
+
       def visit_Arel_Nodes_Offset o
       end
     end
